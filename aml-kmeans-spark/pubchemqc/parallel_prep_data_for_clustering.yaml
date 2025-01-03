@@ -1,0 +1,60 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+
+display_name: prep_data_for_clustering-parallel
+description: prep_data_for_clustering
+name: prep_data_for_clustering_parallel
+
+settings:
+  default_compute: azureml:cpu-cluster-mem
+
+inputs:
+  input_data: 
+    type: uri_folder
+#    path: azureml://subscriptions/781b03e7-6eb7-4506-bab8-cf3a0d89b1d4/resourcegroups/antonslutsky-rg/workspaces/gpu-workspace-2/datastores/workspaceblobstore/paths/data/output/partitions/
+    mode: ro_mount
+
+outputs:
+  job_output_file:
+    type: uri_file
+    mode: rw_mount
+
+jobs:
+  batch_prediction:
+    type: parallel
+    compute: azureml:cpu-cluster-mem
+    inputs:
+      input_data: ${{parent.inputs.input_data}}
+    outputs:
+      job_output_file: ${{parent.outputs.job_output_file}}
+        
+    input_data: ${{inputs.input_data}}
+    mini_batch_size: "1"
+    resources:
+        instance_count: 10
+    max_concurrency_per_instance: 1
+
+    logging_level: "DEBUG"
+    mini_batch_error_threshold: 1
+    retry_settings:
+      max_retries: 1
+      timeout: 6000
+
+    task:
+      type: run_function
+      code: "./src"
+      entry_script: prep_data_for_clustering.py
+      environment:
+        name: "pubchemqc-parallel-env"
+        version: 1
+        image: mcr.microsoft.com/azureml/openmpi4.1.0-ubuntu20.04
+        conda_file: ./environment/pubchemqc_environment.yml
+      program_arguments: >-
+        --error_threshold 5
+        --allowed_failed_percent 30
+        --task_overhead_timeout 1200
+        --progress_update_timeout 6000
+        --first_task_creation_timeout 6000
+        --copy_logs_to_parent True
+        --resource_monitor_interva 20
+      append_row_to: ${{outputs.job_output_file}}

@@ -1,0 +1,81 @@
+$schema: https://azuremlschemas.azureedge.net/latest/pipelineJob.schema.json
+type: pipeline
+
+display_name: Pubchem Pipeline
+description: Pipeline to partition the pubchemqc dataset using Spark process partitions with AML and cluster using Spark ML Kmeans 
+
+# settings:
+#   default_compute: azureml:cpu-cluster-mem
+
+inputs:
+  input_data:
+    type: uri_file
+    #path: azureml://subscriptions/<YOUR SUBSCRIPTION>/resourcegroups/<YOUR SUBSCRIPTION>/workspaces/<YOUR WORKSPACE>/datastores/workspaceblobstore/paths/<PATH TO>.csv
+    #path: azureml://subscriptions/781b03e7-6eb7-4506-bab8-cf3a0d89b1d4/resourcegroups/antonslutsky-rg/workspaces/gpu-workspace-2/datastores/workspaceblobstore/paths/UI/2024-12-23_141934_UTC//UI/2024-12-23_141934_UTC/pubchemqc_sampled_output.csv
+    path: azureml:pubchemqc_sampled_output:1
+    mode: direct
+  num_partitions: 20
+
+outputs:
+  output_clusters:
+    type: uri_folder
+    mode: direct
+
+jobs:
+  spark_split_data:
+    type: spark
+    component: azureml:spark_split_data@latest
+    inputs:
+      input_data: ${{parent.inputs.input_data}}
+      num_partitions: ${{parent.inputs.num_partitions}}
+    outputs:
+      partitions:
+        type: uri_folder
+        mode: direct
+    identity:
+      type: user_identity
+
+    resources:
+      instance_type: standard_e4s_v3
+      runtime_version: "3.3"
+
+    conf:
+      spark.driver.cores: 1
+      spark.driver.memory: 2g
+      spark.executor.cores: 2
+      spark.executor.memory: 2g
+      spark.executor.instances: 2
+
+  prep_data_for_clustering_parallel:
+    type: command
+    component: azureml:prep_data_for_clustering_parallel@latest
+    inputs:
+      input_data: ${{parent.jobs.spark_split_data.outputs.partitions}} 
+
+    outputs:
+      job_output_file:
+        type: uri_file
+        mode: rw_mount
+    compute: azureml:cpu-cluster-mem
+
+  spark_kmeans:
+    type: spark
+    component: azureml:spark_kmeans@latest
+    inputs:
+      scaffold_smiles: ${{parent.jobs.prep_data_for_clustering_parallel.outputs.job_output_file}} 
+    outputs:
+      output_clusters:
+        path: ${{parent.outputs.output_clusters}}
+    identity:
+      type: user_identity
+
+    resources:
+      instance_type: standard_e4s_v3
+      runtime_version: "3.3"
+
+    conf:
+      spark.driver.cores: 1
+      spark.driver.memory: 2g
+      spark.executor.cores: 2
+      spark.executor.memory: 2g
+      spark.executor.instances: 2

@@ -1,0 +1,44 @@
+$schema: http://azureml/sdk-2-0/SparkJob.json
+type: spark
+
+code: ./src
+entry:
+  file: spark_split_data.py
+
+conf:
+  spark.driver.cores: 1
+  spark.driver.memory: 2g
+  spark.executor.cores: 2
+  spark.executor.memory: 2g
+  spark.executor.instances: 2
+
+inputs:
+  input_data:
+    type: uri_file
+    #path: azureml://subscriptions/781b03e7-6eb7-4506-bab8-cf3a0d89b1d4/resourcegroups/antonslutsky-rg/workspaces/gpu-workspace-2/datastores/workspaceblobstore/paths/UI/2024-12-23_141934_UTC/pubchemqc_sampled_output.csv
+    mode: direct
+  num_partitions:
+    type: integer
+
+outputs:
+  partitions:
+    type: uri_folder
+    #path: azureml://datastores/workspaceblobstore/paths/data/output/partitions
+    mode: direct
+    
+    
+args: >-
+  --input_data ${{inputs.input_data}}
+  --partitions ${{outputs.partitions}}
+  --num_partitions ${{inputs.num_partitions}}
+
+identity:
+  type: user_identity
+
+resources:
+  instance_type: standard_e4s_v3
+  runtime_version: "3.3"
+
+experiment_name: pubchemqc
+display_name: spark_split_data
+name: spark_split_data

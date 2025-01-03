@@ -1,0 +1,42 @@
+$schema: http://azureml/sdk-2-0/SparkJob.json
+type: spark
+
+code: ./src
+entry:
+  file: spark_kmeans.py
+
+conf:
+  spark.driver.cores: 1
+  spark.driver.memory: 2g
+  spark.executor.cores: 2
+  spark.executor.memory: 2g
+  spark.executor.instances: 2
+
+inputs:
+  scaffold_smiles:
+    type: uri_file
+    #path: azureml:azureml_68425416-caa8-47df-8a3b-c88b2eb3226a_output_data_job_output_file:1
+    #path: azureml://subscriptions/781b03e7-6eb7-4506-bab8-cf3a0d89b1d4/resourcegroups/antonslutsky-rg/workspaces/gpu-workspace-2/datastores/workspaceblobstore/paths/UI/2024-12-23_141934_UTC/pubchemqc_sampled_output.csv
+    mode: direct
+
+outputs:
+  output_clusters:
+    type: uri_folder
+    #path: azureml://datastores/workspaceblobstore/paths/data/output/output_clusters
+    mode: direct
+    
+    
+args: >-
+  --scaffold_smiles ${{inputs.scaffold_smiles}}
+  --output_clusters ${{outputs.output_clusters}}
+
+identity:
+  type: user_identity
+
+resources:
+  instance_type: standard_e4s_v3
+  runtime_version: "3.3"
+
+experiment_name: pubchemqc
+display_name: spark_kmeans
+name: spark_kmeans
